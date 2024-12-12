@@ -26,11 +26,11 @@ def simulate():
         # Create simulation
         simulation = TokyoSimulation(
             num_agents=params.get('num_agents', 1000),
-            city_bounds=((35.5, 139.4), (35.8, 139.9)),  # Tokyo bounds
+            city_bounds=((35.5, 139.4), (35.8, 139.9)),
             simulation_params={
-                'transmission_rate': params.get('transmission_rate', 0.3),
-                'initial_infected': params.get('initial_infected', 5),
-                'num_stations': params.get('num_stations', 30)
+                'transmission_rate': params.get('transmission_rate', 0.05),  # Reduced from 0.3
+                'initial_infected': params.get('initial_infected', 3),  # Reduced from 5
+                'num_stations': params.get('num_stations', 7)
             }
         )
 
@@ -44,7 +44,7 @@ def simulate():
         video_config = VideoConfig(
             width=params.get('video_width', 1280),
             height=params.get('video_height', 720),
-            fps=params.get('video_fps', 30)
+            fps=params.get('video_fps', 5)
         )
 
         video_generator = SimulationVideoGenerator(video_config)

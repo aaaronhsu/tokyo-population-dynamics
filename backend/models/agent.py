@@ -1,10 +1,10 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from dataclasses import dataclass
 import numpy as np
 
 @dataclass
 class Schedule:
-    location_type: str  # 'home', 'work', 'station', 'izakaya'
+    location_type: str  # 'home', 'work', 'home_station', 'work_station', 'izakaya'
     duration: int      # in hours
     start_time: int    # 24-hour format
 
@@ -14,32 +14,52 @@ class TokyoResident:
         id: int,
         home_location: Tuple[float, float],
         work_location: Tuple[float, float],
-        iza_location: Optional[Tuple[float, float]] = None,
-        station_location: Optional[Tuple[float, float]] = None,
+        home_station: Tuple[float, float],
+        work_station: Tuple[float, float],
+        izakaya_location: Tuple[float, float],
         has_idea: bool = False
     ):
         self.id = id
         self.home_location = home_location
         self.work_location = work_location
+        self.home_station = home_station
+        self.work_station = work_station
+        self.izakaya_location = izakaya_location
         self.current_location = home_location
-        self.iza_location = iza_location
-        self.station_location = station_location
         self.has_idea = has_idea
         self.schedule: List[Schedule] = []
-        self.current_time = 0  # 24-hour format
+        self.current_time = 0
 
     def generate_daily_schedule(self) -> List[Schedule]:
-        """Creates a typical daily schedule for the resident"""
-        # Basic schedule template - can be randomized or made more complex
-        self.schedule = [
-            Schedule("home", 8, 0),      # Sleep/morning at home
-            Schedule("station", 1, 8),    # Morning commute
-            Schedule("work", 8, 9),       # Work
-            Schedule("izakaya", 2, 17),   # After work social
-            Schedule("station", 1, 19),   # Evening commute
-            Schedule("home", 4, 20),      # Evening at home
+        """Creates a realistic daily schedule with commute patterns"""
+        # Add some randomization to timing
+        work_start = np.random.randint(7, 10)  # Wider range of start times
+        izakaya_prob = 0.4  # Reduced from 0.7
+
+        schedule = [
+            Schedule("home", work_start, 0),
+            Schedule("home_station", 1, work_start),
+            Schedule("work_station", 1, work_start + 1),
+            Schedule("work", 8, work_start + 2),
         ]
-        return self.schedule
+
+        # Add evening activities
+        if np.random.random() < izakaya_prob:
+            schedule.extend([
+                Schedule("izakaya", np.random.randint(1, 3), work_start + 10),  # Variable duration
+                Schedule("work_station", 1, work_start + 12),
+                Schedule("home_station", 1, work_start + 13),
+                Schedule("home", 24 - (work_start + 14), work_start + 14)
+            ])
+        else:
+            schedule.extend([
+                Schedule("work_station", 1, work_start + 10),
+                Schedule("home_station", 1, work_start + 11),
+                Schedule("home", 24 - (work_start + 12), work_start + 12)
+            ])
+
+        self.schedule = schedule
+        return schedule
 
     def move(self, time: int) -> Tuple[float, float]:
         """Updates location based on schedule and time"""
@@ -49,14 +69,13 @@ class TokyoResident:
                     self.current_location = self.home_location
                 elif schedule.location_type == "work":
                     self.current_location = self.work_location
-                elif schedule.location_type == "station":
-                    # Add station location logic
-                    self.current_location = self.station_location or self.work_location
+                elif schedule.location_type == "home_station":
+                    self.current_location = self.home_station
+                elif schedule.location_type == "work_station":
+                    self.current_location = self.work_station
                 elif schedule.location_type == "izakaya":
-                    # Add izakaya location logic
-                    self.current_location = self.iza_location or self.home_location
-                else:
-                    self.current_location = self.home_location
+                    self.current_location = self.izakaya_location
+                break
 
         return self.current_location
 

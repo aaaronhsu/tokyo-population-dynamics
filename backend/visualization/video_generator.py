@@ -12,7 +12,7 @@ import traceback
 class VideoConfig:
     width: int = 1280
     height: int = 720
-    fps: int = 30
+    fps: int = 5
     agent_radius: int = 3
     idea_color: tuple = (0, 255, 0)  # Green for agents with idea
     no_idea_color: tuple = (50, 50, 255)  # Red for agents without idea
