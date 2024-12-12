@@ -28,15 +28,15 @@ def simulate():
             num_agents=params.get('num_agents', 1000),
             city_bounds=((35.5, 139.4), (35.8, 139.9)),
             simulation_params={
-                'transmission_rate': params.get('transmission_rate', 0.05),  # Reduced from 0.3
-                'initial_infected': params.get('initial_infected', 3),  # Reduced from 5
+                'transmission_rate': params.get('transmission_rate', 0.05),
+                'initial_infected': params.get('initial_infected', 3),
                 'num_stations': params.get('num_stations', 7)
             }
         )
 
-        # Run simulation and collect states
+        # Run simulation for one week (24 * 7 hours)
         states = []
-        for _ in range(params.get('simulation_hours', 24)):
+        for _ in range(24 * 7):  # One week of hourly states
             simulation.step()
             states.append(simulation.get_state())
 
@@ -66,11 +66,14 @@ def simulate():
             "video_url": f"/static/simulations/{video_id}.mp4",
             "statistics": {
                 "final_infection_rate": states[-1]['infection_rate'],
-                "total_infected": states[-1]['infected_count']
+                "total_infected": states[-1]['infected_count'],
+                "simulation_duration_days": 7
             }
         })
 
     except Exception as e:
+        print(f"Error in simulate endpoint: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({
             "status": "error",
             "message": str(e)

@@ -6,21 +6,22 @@ import folium
 import os
 import io
 from PIL import Image
-import traceback
+from datetime import datetime, timedelta
 
 @dataclass
 class VideoConfig:
     width: int = 1280
     height: int = 720
     fps: int = 5
-    agent_radius: int = 3
-    idea_color: tuple = (0, 255, 0)  # Green for agents with idea
-    no_idea_color: tuple = (50, 50, 255)  # Red for agents without idea
-    background_color: tuple = (25, 25, 25)  # Dark background for text overlay
+    agent_radius: int = 2
+    idea_color: tuple = (0, 255, 0)
+    no_idea_color: tuple = (50, 50, 255)
+    background_color: tuple = (25, 25, 25)
 
 class SimulationVideoGenerator:
     def __init__(self, config: VideoConfig = None):
         self.config = config or VideoConfig()
+        self.start_date = datetime(2024, 1, 1)
         try:
             self.base_frame = self._create_base_frame()
             # Save base frame for verification
@@ -99,67 +100,63 @@ class SimulationVideoGenerator:
 
     def create_frame(self, state: Dict) -> np.ndarray:
         """Create a single frame showing agent positions and idea spread"""
-        try:
-            # Start with the base map frame
-            frame = self.base_frame.copy()
+        # Start with the base map frame
+        frame = self.base_frame.copy()
 
-            # Add agents
-            for location, has_idea in state['agent_locations']:
-                pixel_pos = self._tokyo_coords_to_pixel(location[0], location[1])
-                color = self.config.idea_color if has_idea else self.config.no_idea_color
+        # Calculate current date and time
+        total_hours = state['time']
+        current_datetime = self.start_date + timedelta(hours=total_hours)
+        day_of_week = current_datetime.strftime('%A')
 
-                # Add glow effect for better visibility
-                cv2.circle(
-                    frame,
-                    pixel_pos,
-                    self.config.agent_radius + 2,
-                    color,
-                    -1,
-                    cv2.LINE_AA
-                )
-
-                # Draw agent
-                cv2.circle(
-                    frame,
-                    pixel_pos,
-                    self.config.agent_radius,
-                    color,
-                    -1,
-                    cv2.LINE_AA
-                )
-
-            # Add semi-transparent black rectangle behind text
-            overlay = frame.copy()
-            cv2.rectangle(overlay, (30, 20), (320, 120), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
-
-            # Add stats
-            cv2.putText(
+        # Draw agents
+        for location, has_idea in state['agent_locations']:
+            pixel_pos = self._tokyo_coords_to_pixel(location[0], location[1])
+            color = self.config.idea_color if has_idea else self.config.no_idea_color
+            cv2.circle(
                 frame,
-                f"Time: {state['time']:02d}:00",
-                (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2
+                pixel_pos,
+                self.config.agent_radius,
+                color,
+                -1  # Filled circle
             )
 
-            cv2.putText(
-                frame,
-                f"Infection Rate: {state['infection_rate']:.1%}",
-                (50, 100),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                1,
-                (255, 255, 255),
-                2
-            )
+        # Add stats overlay with background
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (30, 20), (400, 140), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
 
-            return frame
+        # Add text
+        cv2.putText(
+            frame,
+            f"{day_of_week} {current_datetime.strftime('%Y-%m-%d')}",
+            (50, 50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2
+        )
 
-        except Exception as e:
-            print(f"Error creating frame: {str(e)}")
-            print(traceback.format_exc())
-            raise
+        cv2.putText(
+            frame,
+            f"Time: {current_datetime.strftime('%H:00')}",
+            (50, 80),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2
+        )
+
+        cv2.putText(
+            frame,
+            f"Infection Rate: {state['infection_rate']:.1%}",
+            (50, 110),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2
+        )
+
+        return frame
 
     def generate_video(
         self,

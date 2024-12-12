@@ -37,6 +37,7 @@ class TokyoSimulation:
 
         # Major stations with accurate coordinates
         major_stations = [
+            # Major Hub Stations
             ("Tokyo", (35.6812, 139.7671)),
             ("Shinjuku", (35.6896, 139.7006)),
             ("Shibuya", (35.6580, 139.7016)),
@@ -44,33 +45,71 @@ class TokyoSimulation:
             ("Shinagawa", (35.6284, 139.7387)),
             ("Ueno", (35.7141, 139.7774)),
             ("Akihabara", (35.6982, 139.7731)),
+
+            # Yamanote Line
+            ("Harajuku", (35.6702, 139.7027)),
+            ("Ebisu", (35.6462, 139.7103)),
+            ("Meguro", (35.6340, 139.7157)),
+            ("Gotanda", (35.6262, 139.7233)),
+            ("Osaki", (35.6197, 139.7286)),
+            ("Tamachi", (35.6457, 139.7475)),
+            ("Hamamatsucho", (35.6553, 139.7571)),
+            ("Yurakucho", (35.6749, 139.7628)),
+            ("Kanda", (35.6918, 139.7712)),
+            ("Nippori", (35.7281, 139.7707)),
+            ("Komagome", (35.7373, 139.7468)),
+            ("Tabata", (35.7381, 139.7608)),
+
+            # Chuo Line
+            ("Nakano", (35.7073, 139.6659)),
+            ("Ogikubo", (35.7047, 139.6199)),
+            ("Kichijoji", (35.7029, 139.5800)),
+            ("Mitaka", (35.7027, 139.5610)),
+
+            # Other Major Transfer Stations
+            ("Otemachi", (35.6859, 139.7664)),
+            ("Roppongi", (35.6641, 139.7315)),
+            ("Daimon", (35.6563, 139.7555)),
+            ("Nihombashi", (35.6820, 139.7741)),
+            ("Ginza", (35.6742, 139.7639)),
+            ("Kasumigaseki", (35.6731, 139.7504)),
+            ("Aoyama-Itchome", (35.6728, 139.7237)),
+            ("Iidabashi", (35.7019, 139.7456)),
+            ("Takadanobaba", (35.7121, 139.7038)),
         ]
 
+        # Add stations to location manager
         for name, coords in major_stations:
             station = Location('station', coords, station_params)
             self.location_manager.add_location(f'station_{name}', station)
 
-        # Create izakayas near stations
-        izakaya_params = LocationParams(
-            density=0.7,
-            transmission_multiplier=1.3,
-            capacity=50
-        )
+        # Create transfer probabilities between stations
+        self.transfer_probabilities = self._create_transfer_probabilities(major_stations)
 
-        # Create clusters of izakayas near each station
-        for station_name, station_coords in major_stations:
-            for i in range(3):
-                lat_offset = np.random.uniform(-0.005, 0.005)
-                lon_offset = np.random.uniform(-0.005, 0.005)
-                izakaya_coords = (
-                    station_coords[0] + lat_offset,
-                    station_coords[1] + lon_offset
-                )
-                izakaya = Location('izakaya', izakaya_coords, izakaya_params)
-                self.location_manager.add_location(f'izakaya_{station_name}_{i}', izakaya)
+    def _create_transfer_probabilities(self, stations):
+        """Create a dictionary of likely transfer combinations"""
+        transfer_prob = {}
+
+        # Define major transfer routes
+        common_transfers = {
+            "Tokyo": ["Otemachi", "Nihombashi", "Yurakucho"],
+            "Shinjuku": ["Takadanobaba", "Nakano", "Harajuku"],
+            "Shibuya": ["Harajuku", "Ebisu", "Aoyama-Itchome"],
+            "Ikebukuro": ["Takadanobaba", "Komagome", "Tabata"],
+            "Ueno": ["Nippori", "Akihabara", "Okachimachi"],
+            "Akihabara": ["Kanda", "Nihombashi", "Ueno"],
+            "Otemachi": ["Tokyo", "Nihombashi", "Ginza"],
+        }
+
+        # Create probability mappings
+        for start, transfers in common_transfers.items():
+            transfer_prob[f"station_{start}"] = [f"station_{t}" for t in transfers]
+
+        return transfer_prob
+
 
     def _create_agents(self):
-        """Initialize agents with realistic locations"""
+        """Initialize agents with realistic locations and transfer stations"""
         # Convert locations to lists for easier indexing
         stations = [(loc_id, loc) for loc_id, loc in self.location_manager.locations.items()
                    if loc.type == 'station']
@@ -100,6 +139,33 @@ class TokyoSimulation:
             selected_idx = np.random.choice(len(stations), p=station_weights)
             work_station_id, work_station = stations[selected_idx]
 
+            # Generate transfer stations
+            num_transfers = np.random.poisson(2.3)  # Average 2.3 transfers
+            num_transfers = min(max(num_transfers, 1), 3)  # Limit to 1-3 transfers
+
+            # Find potential transfer stations
+            potential_transfers = [
+                s for s in stations
+                if (s[0] != home_station_id and
+                    s[0] != work_station_id and
+                    self._is_between(s[1].coordinates, home_station.coordinates, work_station.coordinates))
+            ]
+
+            # Select transfer stations along the route
+            transfer_stations = []
+            if potential_transfers and num_transfers > 0:
+                # Sort potential transfers by distance from home station
+                potential_transfers.sort(
+                    key=lambda s: self._distance(home_station.coordinates, s[1].coordinates)
+                )
+
+                # Select evenly spaced transfer stations
+                step = len(potential_transfers) // (num_transfers + 1)
+                if step > 0:
+                    for i in range(num_transfers):
+                        idx = min((i + 1) * step, len(potential_transfers) - 1)
+                        transfer_stations.append(potential_transfers[idx][1].coordinates)
+
             # Work location near station with smaller offset
             work_loc = self._add_offset(work_station.coordinates, max_offset=0.005)
 
@@ -121,10 +187,25 @@ class TokyoSimulation:
                 work_location=work_loc,
                 home_station=home_station.coordinates,
                 work_station=work_station.coordinates,
+                transfer_stations=transfer_stations,
                 izakaya_location=izakaya_loc
             )
             agent.generate_daily_schedule()
             self.agents.append(agent)
+
+    def _is_between(self, point: Tuple[float, float],
+                    start: Tuple[float, float],
+                    end: Tuple[float, float],
+                    tolerance: float = 0.1) -> bool:
+        """Check if a point is roughly between start and end points"""
+        # Calculate distances
+        d_start_end = self._distance(start, end)
+        d_start_point = self._distance(start, point)
+        d_point_end = self._distance(point, end)
+
+        # Check if point is roughly along the path
+        # Allow for some deviation from the direct path
+        return abs(d_start_point + d_point_end - d_start_end) < (d_start_end * tolerance)
 
     def _initialize_idea_spread(self):
         """Select initial agents who have the idea"""
@@ -138,11 +219,12 @@ class TokyoSimulation:
 
     def step(self):
         """Advance simulation by one time step"""
-        self.current_time = (self.current_time + 1) % 24
+        # Don't modulo by 24 anymore since we're tracking full week
+        self.current_time += 1
 
         # Move agents
         for agent in self.agents:
-            agent.move(self.current_time)
+            agent.move(self.current_time % 24)  # Pass hour of day to agent
 
         # Process interactions
         self._process_interactions()
