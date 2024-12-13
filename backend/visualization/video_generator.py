@@ -158,17 +158,13 @@ class SimulationVideoGenerator:
 
         return frame
 
-    def generate_video(
-        self,
-        simulation_states: List[Dict],
-        output_path: str
-    ) -> bool:
+    def generate_video(self, simulation_states: List[Dict], output_path: str) -> bool:
         """Generate video from simulation states"""
         try:
-            # Ensure output directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            print(f"Starting video generation to: {output_path}")
 
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # Change codec to 'avc1' which is more web-friendly
+            fourcc = cv2.VideoWriter_fourcc(*'avc1')  # Changed from 'mp4v'
             out = cv2.VideoWriter(
                 output_path,
                 fourcc,
@@ -176,25 +172,60 @@ class SimulationVideoGenerator:
                 (self.config.width, self.config.height)
             )
 
-            print(f"Generating video with {len(simulation_states)} frames")
+            if not out.isOpened():
+                print("Failed to open VideoWriter")
+                # Try fallback codec
+                fourcc = cv2.VideoWriter_fourcc(*'H264')
+                out = cv2.VideoWriter(
+                    output_path,
+                    fourcc,
+                    self.config.fps,
+                    (self.config.width, self.config.height)
+                )
+                if not out.isOpened():
+                    print("Failed to open VideoWriter with fallback codec")
+                    return False
 
+            print(f"Processing {len(simulation_states)} frames")
             for i, state in enumerate(simulation_states):
                 frame = self.create_frame(state)
                 out.write(frame)
-
-                if i % 10 == 0:  # Progress update every 10 frames
-                    print(f"Processed frame {i+1}/{len(simulation_states)}")
-
-                # Save first frame for debugging
-                if i == 0:
-                    cv2.imwrite('static/first_frame.png', frame)
-                    print("First frame saved for debugging")
+                if i % 50 == 0:
+                    print(f"Processed frame {i}/{len(simulation_states)}")
 
             out.release()
-            print("Video generation completed")
-            return True
+
+            # Verify file was created
+            if os.path.exists(output_path):
+                file_size = os.path.getsize(output_path)
+                print(f"Video generated successfully. File size: {file_size} bytes")
+
+                # Try to convert the video to a more web-friendly format using ffmpeg
+                try:
+                    import subprocess
+                    web_output_path = output_path.replace('.mp4', '_web.mp4')
+                    subprocess.run([
+                        'ffmpeg', '-i', output_path,
+                        '-vcodec', 'libx264',
+                        '-acodec', 'aac',
+                        web_output_path
+                    ], check=True)
+
+                    # If conversion successful, replace original file
+                    if os.path.exists(web_output_path):
+                        os.replace(web_output_path, output_path)
+                        print("Successfully converted video to web-friendly format")
+
+                except Exception as e:
+                    print(f"Failed to convert video format: {e}")
+                    # Continue with original file if conversion fails
+
+                return True
+            else:
+                print("Video file not found after generation")
+                return False
 
         except Exception as e:
-            print(f"Error generating video: {str(e)}")
+            print(f"Error generating video: {e}")
             print(traceback.format_exc())
             return False
