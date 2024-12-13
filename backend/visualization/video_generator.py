@@ -133,7 +133,7 @@ class SimulationVideoGenerator:
 
         cv2.putText(
             frame,
-            f"Infection Rate: {state['infection_rate']:.1%}",
+            f"Idea Adoption Rate: {state['infection_rate']:.1%}",
             (50, 100),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.8,

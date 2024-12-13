@@ -16,12 +16,12 @@ import axios from "axios";
 const BACKEND_URL = "http://127.0.0.1:5000";
 
 const DEFAULT_PARAMS = {
-  num_agents: 1000,
+  num_agents: 3000,
   transmission_rate: 0.05,
   initial_infected: 3,
-  izakaya_probability: 0.7, // 70% of people go to izakaya
-  izakaya_capacity: 50, // seats per izakaya
-  train_commuter_ratio: 0.9, // 90% take train to work
+  izakaya_probability: 0.6, // 70% of people go to izakaya
+  izakaya_capacity: 15, // seats per izakaya
+  train_commuter_ratio: 0.6, // 90% take train to work
   avg_transfers: 2.3, // average number of transfers
 };
 
