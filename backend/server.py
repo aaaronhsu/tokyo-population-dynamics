@@ -3,7 +3,7 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 import numpy as np
 import uuid
@@ -16,6 +16,63 @@ CORS(app)
 
 # Ensure the static directories exist
 os.makedirs('static/simulations', exist_ok=True)
+
+@app.route('/static/simulations/<path:filename>')
+def serve_simulation(filename):
+    """Serve generated simulation videos"""
+    try:
+        video_path = os.path.join('static/simulations', filename)
+        if not os.path.exists(video_path):
+            print(f"Video file not found at path: {video_path}")
+            return jsonify({
+                "status": "error",
+                "message": "Video file not found"
+            }), 404
+
+        # Create response without adding Content-Length (Flask will handle this)
+        response = send_file(
+            video_path,
+            mimetype='video/mp4'
+        )
+
+        # Add only necessary headers
+        response.headers.add('Accept-Ranges', 'bytes')
+        response.headers.add('Cache-Control', 'no-cache')
+
+        return response
+
+    except Exception as e:
+        print(f"Error serving video: {e}")
+        print(traceback.format_exc())
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+@app.route('/video-info/<path:filename>')
+def get_video_info(filename):
+    """Debug endpoint to get video file information"""
+    try:
+        video_path = os.path.join('static/simulations', filename)
+        if os.path.exists(video_path):
+            file_size = os.path.getsize(video_path)
+            return jsonify({
+                "status": "success",
+                "file_exists": True,
+                "file_size": file_size,
+                "file_path": video_path,
+                "is_readable": os.access(video_path, os.R_OK)
+            })
+        return jsonify({
+            "status": "error",
+            "message": "File not found",
+            "checked_path": video_path
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
 
 @app.route('/simulate', methods=['POST'])
 def simulate():
@@ -36,7 +93,7 @@ def simulate():
 
         # Run simulation for one week (24 * 7 hours)
         states = []
-        for _ in range(24 * 7):  # One week of hourly states
+        for _ in range(24 * 7):
             simulation.step()
             states.append(simulation.get_state())
 
@@ -72,17 +129,18 @@ def simulate():
         })
 
     except Exception as e:
-        print(f"Error in simulate endpoint: {str(e)}")
+        print(f"Error in simulate endpoint: {e}")
         print(traceback.format_exc())
         return jsonify({
             "status": "error",
             "message": str(e)
         }), 500
 
-@app.route('/static/simulations/<path:filename>')
-def serve_simulation(filename):
-    """Serve generated simulation videos"""
-    return send_from_directory('static/simulations', filename)
+# Add headers for video streaming
+@app.after_request
+def after_request(response):
+    response.headers.add('Accept-Ranges', 'bytes')
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True)
