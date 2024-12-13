@@ -7,6 +7,9 @@ import {
   Typography,
   TextField,
   Alert,
+  Slider,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 import axios from "axios";
 
@@ -16,6 +19,10 @@ const DEFAULT_PARAMS = {
   num_agents: 1000,
   transmission_rate: 0.05,
   initial_infected: 3,
+  izakaya_probability: 0.7, // 70% of people go to izakaya
+  izakaya_capacity: 50, // seats per izakaya
+  train_commuter_ratio: 0.9, // 90% take train to work
+  avg_transfers: 2.3, // average number of transfers
 };
 
 const SimulationPlayer = () => {
@@ -32,7 +39,6 @@ const SimulationPlayer = () => {
     try {
       const response = await axios.post(`${BACKEND_URL}/simulate`, params);
       if (response.data.status === "success") {
-        // Instead of opening in a new tab, set the video URL
         setVideoUrl(`${BACKEND_URL}${response.data.video_url}`);
         setStats(response.data.statistics);
       }
@@ -56,6 +62,14 @@ const SimulationPlayer = () => {
     }
   };
 
+  // Handler for slider changes
+  const handleSliderChange = (param) => (event, newValue) => {
+    setParams((prev) => ({
+      ...prev,
+      [param]: newValue,
+    }));
+  };
+
   return (
     <Box sx={{ maxWidth: 1200, margin: "0 auto", padding: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -66,36 +80,112 @@ const SimulationPlayer = () => {
         <Typography variant="h6" gutterBottom>
           Simulation Parameters
         </Typography>
-        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+
+        {/* Basic Parameters */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Basic Parameters
+          </Typography>
+          <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
+            <TextField
+              label="Number of Office Workers"
+              type="number"
+              value={params.num_agents}
+              onChange={handleParamChange("num_agents")}
+              sx={{ width: 200 }}
+              inputProps={{ min: 1 }}
+            />
+            <TextField
+              label="Idea Virality"
+              type="number"
+              inputProps={{
+                step: 0.01,
+                min: 0,
+                max: 1,
+              }}
+              value={params.transmission_rate}
+              onChange={handleParamChange("transmission_rate")}
+              sx={{ width: 200 }}
+            />
+            <TextField
+              label="Number of Initial Idea Spreaders"
+              type="number"
+              value={params.initial_infected}
+              onChange={handleParamChange("initial_infected")}
+              sx={{ width: 200 }}
+              inputProps={{ min: 1 }}
+            />
+          </Box>
+        </Box>
+
+        {/* Izakaya Parameters */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Yokocho Parameters
+          </Typography>
+          <Box sx={{ width: "100%", mb: 2 }}>
+            <Typography gutterBottom>
+              Probability of Going to Yokocho:{" "}
+              {(params.izakaya_probability * 100).toFixed(0)}%
+            </Typography>
+            <Slider
+              value={params.izakaya_probability}
+              onChange={handleSliderChange("izakaya_probability")}
+              min={0}
+              max={1}
+              step={0.1}
+              marks
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${(value * 100).toFixed(0)}%`}
+            />
+          </Box>
           <TextField
-            label="Number of Agents"
+            label="Yokocho Capacity"
             type="number"
-            value={params.num_agents}
-            onChange={handleParamChange("num_agents")}
-            sx={{ width: 200 }}
-            inputProps={{ min: 1 }}
-          />
-          <TextField
-            label="Transmission Rate"
-            type="number"
-            inputProps={{
-              step: 0.01,
-              min: 0,
-              max: 1,
-            }}
-            value={params.transmission_rate}
-            onChange={handleParamChange("transmission_rate")}
-            sx={{ width: 200 }}
-          />
-          <TextField
-            label="Initial Infected"
-            type="number"
-            value={params.initial_infected}
-            onChange={handleParamChange("initial_infected")}
+            value={params.izakaya_capacity}
+            onChange={handleParamChange("izakaya_capacity")}
             sx={{ width: 200 }}
             inputProps={{ min: 1 }}
           />
         </Box>
+
+        {/* Transportation Parameters */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            Transportation Parameters
+          </Typography>
+          <Box sx={{ width: "100%", mb: 2 }}>
+            <Typography gutterBottom>
+              Train Commuter Ratio:{" "}
+              {(params.train_commuter_ratio * 100).toFixed(0)}%
+            </Typography>
+            <Slider
+              value={params.train_commuter_ratio}
+              onChange={handleSliderChange("train_commuter_ratio")}
+              min={0}
+              max={1}
+              step={0.1}
+              marks
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => `${(value * 100).toFixed(0)}%`}
+            />
+          </Box>
+          <Box sx={{ width: "100%", mb: 2 }}>
+            <Typography gutterBottom>
+              Average Number of Transfers: {params.avg_transfers}
+            </Typography>
+            <Slider
+              value={params.avg_transfers}
+              onChange={handleSliderChange("avg_transfers")}
+              min={0}
+              max={5}
+              step={0.1}
+              marks
+              valueLabelDisplay="auto"
+            />
+          </Box>
+        </Box>
+
         <Button
           variant="contained"
           onClick={runSimulation}
@@ -142,10 +232,12 @@ const SimulationPlayer = () => {
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
             <Typography>
-              Final Infection Rate:{" "}
+              Final Idea Adoption Rate (%):{" "}
               {(stats.final_infection_rate * 100).toFixed(1)}%
             </Typography>
-            <Typography>Total Infected: {stats.total_infected}</Typography>
+            <Typography>
+              Total People With Idea: {stats.total_infected}
+            </Typography>
             {stats.simulation_duration_days && (
               <Typography>
                 Simulation Duration: {stats.simulation_duration_days} days

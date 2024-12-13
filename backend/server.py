@@ -82,14 +82,18 @@ def simulate():
 
         # Create simulation
         simulation = TokyoSimulation(
-            num_agents=params.get('num_agents', 1000),
-            city_bounds=((35.5, 139.4), (35.8, 139.9)),
-            simulation_params={
-                'transmission_rate': params.get('transmission_rate', 0.05),
-                'initial_infected': params.get('initial_infected', 3),
-                'num_stations': params.get('num_stations', 7)
-            }
-        )
+                    num_agents=params.get('num_agents', 1000),
+                    city_bounds=((35.5, 139.4), (35.8, 139.9)),
+                    simulation_params={
+                        'transmission_rate': params.get('transmission_rate', 0.01),  # Reduced base rate
+                        'initial_infected': params.get('initial_infected', 3),
+                        'num_stations': params.get('num_stations', 7),
+                        'izakaya_probability': params.get('izakaya_probability', 0.7),
+                        'izakaya_capacity': params.get('izakaya_capacity', 50),
+                        'train_commuter_ratio': params.get('train_commuter_ratio', 0.9),
+                        'avg_transfers': params.get('avg_transfers', 2.3)
+                    }
+                )
 
         # Run simulation for one week (24 * 7 hours)
         states = []
