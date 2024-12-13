@@ -1,37 +1,26 @@
-import { useState } from "react";
+import { CssBaseline, Box, Typography } from "@mui/material";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import SimulationDescription from "./components/SimulationDescription";
+import SimulationPlayer from "./components/SimulationPlayer";
+
+const theme = createTheme({
+  palette: {
+    mode: "dark",
+  },
+});
 
 function App() {
-  const [showMap, setShowMap] = useState(false);
-
-  const handleSimulate = async () => {
-    try {
-      const response = await fetch("/api/simulate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (response.ok) {
-        setShowMap(true);
-      }
-    } catch (error) {
-      console.error("Error:", error);
-    }
-  };
-
   return (
-    <div>
-      <button onClick={handleSimulate}>Run Simulation</button>
-      {showMap && (
-        <iframe
-          src="http://127.0.0.1:5000/static/map.html"
-          width="800"
-          height="600"
-          frameBorder="0"
-        />
-      )}
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ maxWidth: 1200, margin: "0 auto", padding: 3 }}>
+        <Typography variant="h3" gutterBottom align="center" sx={{ mb: 4 }}>
+          Tokyo Idea Propagation Simulation
+        </Typography>
+        <SimulationDescription />
+        <SimulationPlayer />
+      </Box>
+    </ThemeProvider>
   );
 }
 
