@@ -26,18 +26,56 @@ class SimulationVideoGenerator:
         self.base_frame = self._get_base_frame()
 
     def _get_base_frame(self) -> np.ndarray:
-        """Get the base frame, either from cache or create new"""
-        if SimulationVideoGenerator._cached_base_frame is None:
-            print("Generating new Tokyo map...")
-            SimulationVideoGenerator._cached_base_frame = self._create_base_frame()
+        """Get the base frame from cached file or create new"""
+        cached_map_path = os.path.join('static', 'base_map.png')
 
-            # Save the base frame for verification if needed
+        if os.path.exists(cached_map_path):
+            print("Loading cached Tokyo map...")
+            frame = cv2.imread(cached_map_path)
+            if frame is not None:
+                frame = cv2.resize(frame, (self.config.width, self.config.height))
+                print(f"Successfully loaded cached map with shape: {frame.shape}")
+                return frame
+
+        print("Cached map not found or invalid, generating new map...")
+        try:
+            # Create Folium map
+            m = folium.Map(
+                location=[35.65, 139.65],  # Tokyo center
+                zoom_start=11,
+                tiles='CartoDB dark_matter',
+                width=self.config.width,
+                height=self.config.height
+            )
+
+            # Get PNG data
+            img_data = m._to_png(5)
+
+            # Convert to PIL Image
+            img = Image.open(io.BytesIO(img_data))
+
+            # Convert PIL Image to numpy array
+            frame = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+
+            # Resize to match video dimensions
+            frame = cv2.resize(frame, (self.config.width, self.config.height))
+
+            # Save the generated map for future use
             os.makedirs('static', exist_ok=True)
-            cv2.imwrite('static/base_map.png', SimulationVideoGenerator._cached_base_frame)
-            print("Base map cached and saved to static/base_map.png")
+            cv2.imwrite(cached_map_path, frame)
+            print(f"Generated and cached new map with shape: {frame.shape}")
 
-        # Return a copy of the cached frame
-        return SimulationVideoGenerator._cached_base_frame.copy()
+            return frame
+
+        except Exception as e:
+            print(f"Error creating base frame: {str(e)}")
+            # Return a black frame as fallback
+            return np.full(
+                (self.config.height, self.config.width, 3),
+                self.config.background_color,
+                dtype=np.uint8
+            )
+
 
     def _create_base_frame(self) -> np.ndarray:
         """Create the base Tokyo map frame"""
@@ -150,21 +188,64 @@ class SimulationVideoGenerator:
     ) -> bool:
         """Generate video from simulation states"""
         try:
-            fourcc = cv2.VideoWriter_fourcc(*'avc1')
-            out = cv2.VideoWriter(
-                output_path,
-                fourcc,
-                self.config.fps,
-                (self.config.width, self.config.height)
-            )
+            print(f"Starting video generation to: {output_path}")
 
-            for state in simulation_states:
+            # Try different codec options
+            codecs = [
+                ('mp4v', '.mp4'),
+                ('avc1', '.mp4'),
+                ('X264', '.mp4'),
+                ('XVID', '.avi'),
+            ]
+
+            for codec, ext in codecs:
+                try:
+                    # Update output path with correct extension
+                    current_output = output_path.rsplit('.', 1)[0] + ext
+
+                    fourcc = cv2.VideoWriter_fourcc(*codec)
+                    out = cv2.VideoWriter(
+                        current_output,
+                        fourcc,
+                        self.config.fps,
+                        (self.config.width, self.config.height)
+                    )
+
+                    if out.isOpened():
+                        print(f"Successfully initialized VideoWriter with codec: {codec}")
+                        break
+                except Exception as e:
+                    print(f"Failed to initialize codec {codec}: {e}")
+                    continue
+            else:
+                print("Failed to initialize any video codec")
+                return False
+
+            print(f"Processing {len(simulation_states)} frames")
+            for i, state in enumerate(simulation_states):
                 frame = self.create_frame(state)
                 out.write(frame)
+                if i % 50 == 0:
+                    print(f"Processed frame {i}/{len(simulation_states)}")
 
             out.release()
-            return True
+
+            # Verify file was created
+            if os.path.exists(current_output):
+                file_size = os.path.getsize(current_output)
+                print(f"Video generated successfully. File size: {file_size} bytes")
+
+                # If the output path is different from the original, rename it
+                if current_output != output_path:
+                    os.rename(current_output, output_path)
+
+                return True
+            else:
+                print("Video file not found after generation")
+                return False
 
         except Exception as e:
             print(f"Error generating video: {e}")
+            import traceback
+            print(traceback.format_exc())
             return False
