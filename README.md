@@ -1,5 +1,6 @@
 # Tokyo Idea Propagation Simulation
 
+[video](https://github.com/aaaronhsu/tokyo-population-dynamics/blob/1dda26edf2363ee521ae12ce276b6727eb76493a/backend/static/simulations/default.mp4)
 [view here](https://tokyo-population-dynamics.onrender.com)
 
 ## Overview
